@@ -1,0 +1,104 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Steven Durham"
+date: "February 22, 2015"
+output: html_document
+---
+
+##Summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The goal of this project is to predict the manner in which they did the exercise. I will also use the prediction model to predict 20 different test cases.
+
+##Load Libraries and Set the Seed
+```{r}
+# Make sure the following packages are installed
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+
+#For reproduceability
+set.seed(1792)
+```
+
+##Getting and Cleaning Data
+```{r}
+# Download the data
+if(!file.exists("./training.csv")){
+        fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        download.file(fileUrl, "training.csv", method = "curl")
+}
+
+if(!file.exists("./testing.csv")){
+        fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+        download.file(fileUrl, "testing.csv", method = "curl")
+}
+
+#Load the data into R and replace missing values with NA
+training_data <- read.csv("training.csv", na.strings=c("NA","#DIV/0!",""))
+testing_data <- read.csv("testing.csv", na.strings=c("NA","#DIV/0!",""))
+
+# Delete columns with missing values
+training_data <- training_data[,colSums(is.na(training_data)) == 0]
+testing_data <-testing_data[,colSums(is.na(testing_data)) == 0]
+
+# Delete variables irrelevant to this project
+training_data <- training_data[,-c(1:7)]
+testing_data <- testing_data[,-c(1:7)]
+
+# Examine the data
+dim(training_data)
+dim(testing_data)
+colnames(training_data) # Variables are the same for testing_data
+
+# Partition the data (60% for training and 40% for testing)
+sample <- createDataPartition(y=training_data$classe, p=0.6, list=FALSE)
+training_sample <- training_data[sample, ] 
+testing_sample <- training_data[-sample, ]
+
+# Examine the partitioned data
+dim(training_sample)
+dim(testing_sample)
+```
+
+## Exploratory Data Analysis
+Perform this step to get an idea of what the algorithm should predict.
+
+```{r}
+summary(training_sample$classe)
+```
+
+```{r, echo=FALSE}
+plot(training_sample$classe, col="blue", main="Bar Plot of the Variable 'classe' Within the Training Sample", xlab="classe levels", ylab="Frequency")
+```
+
+##Prediction
+
+###Model One: Decision Trees
+```{r}
+model_one <- rpart(classe ~ ., data=training_sample, method="class")
+rpart.plot(model_one, main="Decision Tree", extra=102, under=TRUE, faclen=0)
+
+# Prediction
+prediction_one <- predict(model_one, testing_sample, type = "class")
+
+# Testing Prediction Results
+confusionMatrix(prediction_one, testing_sample$classe)
+```
+
+###Model Two: Random Forests
+```{r}
+model_two <- randomForest(classe ~. , data=training_sample, method="class")
+
+# Prediction:
+prediction_two <- predict(model_two, testing_sample, type = "class")
+
+# Test Prediction Results:
+confusionMatrix(prediction_two, testing_sample$classe)
+```
+
+##Results
+As expected, the random forest model yielded better results than the decision tree model, with an out of sample error of .0046 vs .2931 respectively. Thus the random forest model will be used for the assignment submission.
+
